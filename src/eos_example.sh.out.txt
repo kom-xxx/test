@@ -1,0 +1,5 @@
+thr: EOS has heen sent
+bus_call: got EOS
+main: exited main_loop
+main: thread:140603057243712 joined
+grep: output/camera.mp4: binary file matches
