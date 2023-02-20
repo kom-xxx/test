@@ -1,0 +1,185 @@
+[plantuml]
+----
+participant XXX
+participant NodeRef
+participant InputCntl
+participant SequenceBase1
+participant DataQueue1
+participant QueueInfo1
+participant EditCntl
+participant SequenceBase2
+participant DataQueue2
+participant QueueInfo2
+participant UTILs
+
+XXX -> NodeRef : CreateSequence
+activate NodeRef
+NodeRef -> NodeRef : CreateInput
+activate NodeRef
+NodeRef -> UTILs : MakeSharedPtr<InputCntl>
+UTILs -> InputCntl : constructor
+activate InputCntl
+InputCntl -> SequenceBase1 : constructor
+note right : InputCntl is a subclass of SequenceBase, so automaticary constructed
+activate SequenceBase1
+NodeRef <- UTILs : status
+deactivate NodeRef
+
+NodeRef -> NodeRef : CreateEdit
+activate NodeRef
+NodeRef -> NodeRef : CreateInput
+NodeRef -> UTILs : MakeSharedPtr<EditCntl>
+UTILs -> EditCntl : constructor
+activate EditCntl
+NodeRef <- UTILs : status
+deactivate NodeRef
+XXX <- NodeRef : status
+deactivate NodeRef
+----
+
+[plantuml]
+----
+participant XXX
+participant NodeRef
+participant InputCntl
+participant SequenceBase1
+participant DataQueue1
+participant QueueInfo1
+participant EditCntl
+participant SequenceBase2
+participant DataQueue2
+participant QueueInfo2
+participant UTILs
+
+XXX -> NodeRef : ConnectSequece
+activate NodeRef
+NodeRef -> InputCntl : AddOutQueue
+note right : does not exist, replace with Node -> SequenceBase AddOutQueue
+InputCntl -> SequenceBase1 : AddOutQueue
+activate SequenceBase1
+SequenceBase1 -> QueueInfo1 : constructor
+activate QueueInfo1
+SequenceBase1 -> DataQueue1 : constructor
+activate DataQueue1
+SequenceBase1 <- DataQueue1 : instance
+SequenceBase1 <- SequenceBase1 :
+note right : register DataQueue instance into linkbase_queue
+SequenceBase1 -> DataQueue1 : SetQueueIndex
+note right : index of last element of deque
+SequenceBase1 -> SequenceBase1 : SetThreadPtr
+activate SequenceBase1
+SequenceBase1 -> SequenceBase1 : GetBaseeInfo
+activate SequenceBase1
+SequenceBase1 -> QueueInfo1 : GetThreadPtr
+SequenceBase1 <- QueueInfo1 : pointer of thread pointer
+deactivate SequenceBase1
+SequenceBase1 -> SequenceBase1 : set thread ptr
+note right : at this point, thread ptr is a placeholder which have not valid thread
+deactivate SequenceBase1
+InputCntl <- SequenceBase1 : queue_ptr
+deactivate SequenceBase1
+NodeRef <- InputCntl : queue_ptr
+
+NodeRef -> EditCntl : ConnectSequenceBase
+EditCntl -> SequenceBase2 : ConnectSequenceBase
+activate SequenceBase2
+SequenceBase2 -> DataQueue2 : SetQueueInfo
+note right : arg = &SetQueueInfo.linkbase_info_
+DataQueue2 -> QueueInfo2 : AddQuue
+note right : increase deque and put dataqueue_ptr to new entry
+DataQueue2 <- QueueInfo2 : queue_index
+note right : index # of new entry
+SequenceBase2 <- DataQueue2 : queue_index
+EditCntl <- SequenceBase2 : queue_index
+deactivate SequenceBase2
+NodeRef <- EditCntl : queue_index
+XXX <- NodeRef : bool
+deactivate NodeRef
+
+----
+
+[plantuml]
+----
+participant XXX
+participant NodeRef
+/'
+participant InputCntl
+participant SequenceBase1
+participant DataQueue1
+participant QueueInfo1
+'/
+participant EditCntl
+participant ImageScaler
+participant FrameEdit
+participant EditCntlThread
+participant SequenceBaseThread
+participant Thread
+participant ThreadFunction
+participant SequenceBase
+participant DataQueue
+participant QueueInfo
+participant UTILs
+
+activate SequenceBase
+activate EditCntl
+
+XXX -> NodeRef : StartSequence
+activate NodeRef
+NodeRef -> EditCntl : Start
+EditCntl -> ImageScaler : constructor
+activate ImageScaler
+EditCntl -> FrameEdit : constructor
+activate FrameEdit
+EditCntl -> FrameEdit : Setup
+FrameEdit -> FrameEdit : create APISetupEdit
+EditCntl -> EditCntlThread : constructor
+activate EditCntlThread
+EditCntlThread -> SequenceBaseThread : constructor
+activate SequenceBaseThread
+SequenceBaseThread -> Thread : constructor
+activate Thread
+Thread -> Thread : status_ = kThreadStatusInit
+EditCntlThread -> EditCntlThread : link_base_ptr_ = EditCntl
+EditCntl -> SequenceBase : Start
+note right : arg = edit_cntl_thread_
+SequenceBase -> SequenceBase : linkbase_thread_ = edit_cntl_thread_
+SequenceBase -> QueueInfo : SetThread
+SequenceBase <- QueueInfo :
+SequenceBase -> SequenceBaseThread : ThreadStart
+activate SequenceBaseThread
+SequenceBaseThread -> Thread : Start
+Thread -> ThreadFunction : pthread_create
+activate ThreadFunction
+ThreadFunction -> Thread : StartFunction
+ThreadFunction <- Thread :
+ThreadFunction -> Thread : status_ = kThreadStatusWaiting
+Tread -> Tread : cond_.wait
+ThreadFunction <- Thread :
+SequenceBase -> SequenceBase : start_status = kThreadStatusInit
+SequenceBaseThread -> SequenceBaseThread : PushEvent
+note right : arg = kDataLinkIDStart
+activate SequenceBaseThread
+SequenceBaseThread -> Thread : PushEvent
+Thread -> Thread : push kDataLinkIDStart to normal_queue_
+activate Thread
+Thread -> Thread : wait for status != kThreadStatusInit
+Thread -> Thread : cond_.notify_one
+loop status_ == kThreadStatusWaiting
+ThreadFunction -> Thread : IdleFunction
+ThreadFunction <- Thread :
+ThreadFunction -> SequenceBaseThread : EventFunction
+SequenceBaseThread -> SequenceBaseThread : EventStart = true
+SequenceBaseThread -> SequenceBaseThread : start_status_ = kThreadStartOK
+SequenceBaseThread -> SequenceBaseThread : start_cond_.notify_one
+ThreadFunction <- SequenceBaseThread : kThreadStatusRunning
+end
+SequenceBaseThread <- Thread : bool
+deactivate Thread
+SequenceBaseThread -> SequenceBaseThread : start_cond_.wait
+note right : wating for start_cond_ != kDataLinkIDStart
+SequenceBase <- SequenceBaseThread : bool
+deactivate SequenceBaseThread
+EditCntl <- SequenceBase : bool
+NodeRef <- EditCntl : bool
+XXX <- NodeRef : bool
+----
