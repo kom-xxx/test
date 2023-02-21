@@ -1,0 +1,58 @@
+@startuml
+participant XXX
+participant NodeRef
+participant InputCntl
+participant SequenceBase1
+participant DataQueue1
+participant QueueInfo1
+participant EditCntl
+participant SequenceBase2
+participant DataQueue2
+participant QueueInfo2
+participant UTILs
+
+XXX -> NodeRef : ConnectSequece
+activate NodeRef
+NodeRef -> InputCntl : AddOutQueue
+note right : does not exist, replace with Node -> SequenceBase AddOutQueue
+InputCntl -> SequenceBase1 : AddOutQueue
+activate SequenceBase1
+SequenceBase1 -> QueueInfo1 : constructor
+activate QueueInfo1
+SequenceBase1 -> DataQueue1 : constructor
+activate DataQueue1
+SequenceBase1 <- DataQueue1 : instance
+SequenceBase1 <- SequenceBase1 :
+note right : register DataQueue instance into linkbase_queue
+SequenceBase1 -> DataQueue1 : SetQueueIndex
+note right : index of last element of deque
+SequenceBase1 -> SequenceBase1 : SetThreadPtr
+activate SequenceBase1
+SequenceBase1 -> SequenceBase1 : GetBaseeInfo
+activate SequenceBase1
+SequenceBase1 -> QueueInfo1 : GetThreadPtr
+SequenceBase1 <- QueueInfo1 : pointer of thread pointer
+deactivate SequenceBase1
+SequenceBase1 -> SequenceBase1 : set thread ptr
+note right : at this point, thread ptr is a placeholder which have not valid thread
+deactivate SequenceBase1
+InputCntl <- SequenceBase1 : queue_ptr
+deactivate SequenceBase1
+NodeRef <- InputCntl : queue_ptr
+
+NodeRef -> EditCntl : ConnectSequenceBase
+EditCntl -> SequenceBase2 : ConnectSequenceBase
+activate SequenceBase2
+SequenceBase2 -> DataQueue2 : SetQueueInfo
+note right : arg = &SetQueueInfo.linkbase_info_
+DataQueue2 -> QueueInfo2 : AddQuue
+note right : increase deque and put dataqueue_ptr to new entry
+DataQueue2 <- QueueInfo2 : queue_index
+note right : index # of new entry
+SequenceBase2 <- DataQueue2 : queue_index
+EditCntl <- SequenceBase2 : queue_index
+deactivate SequenceBase2
+NodeRef <- EditCntl : queue_index
+XXX <- NodeRef : bool
+deactivate NodeRef
+@enduml

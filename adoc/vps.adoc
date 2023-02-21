@@ -153,15 +153,15 @@ activate ThreadFunction
 ThreadFunction -> Thread : StartFunction
 ThreadFunction <- Thread :
 ThreadFunction -> Thread : status_ = kThreadStatusWaiting
-Tread -> Tread : cond_.wait
+Thread -> Thread : cond_.wait
 ThreadFunction <- Thread :
 SequenceBase -> SequenceBase : start_status = kThreadStatusInit
 SequenceBaseThread -> SequenceBaseThread : PushEvent
 note right : arg = kDataLinkIDStart
 activate SequenceBaseThread
 SequenceBaseThread -> Thread : PushEvent
-Thread -> Thread : push kDataLinkIDStart to normal_queue_
 activate Thread
+Thread -> Thread : push kDataLinkIDStart to normal_queue_
 Thread -> Thread : wait for status != kThreadStatusInit
 Thread -> Thread : cond_.notify_one
 loop status_ == kThreadStatusWaiting

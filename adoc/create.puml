@@ -1,0 +1,37 @@
+@startuml
+participant XXX
+participant NodeRef
+participant InputCntl
+participant SequenceBase1
+participant DataQueue1
+participant QueueInfo1
+participant EditCntl
+participant SequenceBase2
+participant DataQueue2
+participant QueueInfo2
+participant UTILs
+
+XXX -> NodeRef : CreateSequence
+activate NodeRef
+NodeRef -> NodeRef : CreateInput
+activate NodeRef
+NodeRef -> UTILs : MakeSharedPtr<InputCntl>
+UTILs -> InputCntl : constructor
+activate InputCntl
+InputCntl -> SequenceBase1 : constructor
+note right : InputCntl is a subclass of SequenceBase, so automaticary constructed
+activate SequenceBase1
+NodeRef <- UTILs : status
+deactivate NodeRef
+
+NodeRef -> NodeRef : CreateEdit
+activate NodeRef
+NodeRef -> NodeRef : CreateInput
+NodeRef -> UTILs : MakeSharedPtr<EditCntl>
+UTILs -> EditCntl : constructor
+activate EditCntl
+NodeRef <- UTILs : status
+deactivate NodeRef
+XXX <- NodeRef : status
+deactivate NodeRef
+@enduml

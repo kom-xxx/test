@@ -1,0 +1,84 @@
+@startuml
+participant XXX
+participant NodeRef
+/'
+participant InputCntl
+participant SequenceBase1
+participant DataQueue1
+participant QueueInfo1
+'/
+participant EditCntl
+participant ImageScaler
+participant FrameEdit
+participant EditCntlThread
+participant SequenceBaseThread
+participant Thread
+participant ThreadFunction
+participant SequenceBase
+participant DataQueue
+participant QueueInfo
+participant UTILs
+
+activate SequenceBase
+activate EditCntl
+
+XXX -> NodeRef : StartSequence
+activate NodeRef
+NodeRef -> EditCntl : Start
+EditCntl -> ImageScaler : constructor
+activate ImageScaler
+EditCntl -> FrameEdit : constructor
+activate FrameEdit
+EditCntl -> FrameEdit : Setup
+FrameEdit -> FrameEdit : create APISetupEdit
+EditCntl -> EditCntlThread : constructor
+activate EditCntlThread
+EditCntlThread -> SequenceBaseThread : constructor
+activate SequenceBaseThread
+SequenceBaseThread -> Thread : constructor
+activate Thread
+Thread -> Thread : status_ = kThreadStatusInit
+EditCntlThread -> EditCntlThread : link_base_ptr_ = EditCntl
+EditCntl -> SequenceBase : Start
+note right : arg = edit_cntl_thread_
+SequenceBase -> SequenceBase : linkbase_thread_ = edit_cntl_thread_
+SequenceBase -> QueueInfo : SetThread
+SequenceBase <- QueueInfo :
+SequenceBase -> SequenceBaseThread : ThreadStart
+activate SequenceBaseThread
+SequenceBaseThread -> Thread : Start
+Thread -> ThreadFunction : pthread_create
+activate ThreadFunction
+ThreadFunction -> Thread : StartFunction
+ThreadFunction <- Thread :
+ThreadFunction -> Thread : status_ = kThreadStatusWaiting
+Thread -> Thread : cond_.wait
+ThreadFunction <- Thread :
+SequenceBase -> SequenceBase : start_status = kThreadStatusInit
+SequenceBaseThread -> SequenceBaseThread : PushEvent
+note right : arg = kDataLinkIDStart
+activate SequenceBaseThread
+SequenceBaseThread -> Thread : PushEvent
+activate Thread
+Thread -> Thread : push kDataLinkIDStart to normal_queue_
+Thread -> Thread : wait for status != kThreadStatusInit
+Thread -> Thread : cond_.notify_one
+loop status_ == kThreadStatusWaiting
+ThreadFunction -> Thread : IdleFunction
+ThreadFunction <- Thread :
+ThreadFunction -> SequenceBaseThread : EventFunction
+SequenceBaseThread -> SequenceBaseThread : EventStart = true
+SequenceBaseThread -> SequenceBaseThread : start_status_ = kThreadStartOK
+SequenceBaseThread -> SequenceBaseThread : start_cond_.notify_one
+ThreadFunction <- SequenceBaseThread : kThreadStatusRunning
+end
+SequenceBaseThread <- Thread : bool
+deactivate Thread
+SequenceBaseThread -> SequenceBaseThread : start_cond_.wait
+note right : wating for start_cond_ != kDataLinkIDStart
+SequenceBase <- SequenceBaseThread : bool
+deactivate SequenceBaseThread
+EditCntl <- SequenceBase : bool
+NodeRef <- EditCntl : bool
+XXX <- NodeRef : bool
+@enduml
