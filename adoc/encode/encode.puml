@@ -1,0 +1,67 @@
+@startuml
+participant NodeRef_or_DataSeq
+participant EditCntl
+participant DataQueue_Edit
+participant QueueInfo_Edit
+participant EncodeCntl
+participant QueueInfo_Encode
+participant RelatedId
+
+activate EditCntl
+activate QueueInfo_Edit
+
+NodeRef_or_DataSeq -> EncodeCntl : constructor
+activate EncodeCntl
+note left /'of EncodeCntl'/
+	from noderef.cpp
+	CreateEncode()
+end note
+note right
+	string& path,
+	shared_ptr<APISetupEncode> encode,
+	shared_ptr<APISetupVideoInput> v4l2_input
+end note
+EncodeCntl -> EncodeCntl : path_(path) encde_(encode) v4l2_input_(v4l2_input)
+EncodeCntl -> QueueInfo_Encode : constructor
+activate QueueInfo_Encode
+EncodeCntl -> RelatedId : constructor
+activate RelatedId
+NodeRef_or_DataSeq <- EncodeCntl
+NodeRef_or_DataSeq -> EditCntl : AddOutQueue
+note left
+	from noderef.cpp
+	ConnectSequnce
+end note
+activate EditCntl
+EditCntl -> DataQueue_Edit : constructor
+activate DataQueue_Edit
+EditCntl -> EditCntl : add dataqueue into linkbase_queue_
+activate EditCntl
+EditCntl -> DataQueue_Edit : SetQueueIndex(last_index)
+DataQueue_Edit -> DataQueue_Edit : link_index_no = last_index
+activate DataQueue_Edit
+EditCntl <- DataQueue_Edit :
+deactivate DataQueue_Edit
+
+NodeRef_or_DataSeq <- EditCntl : outqueue
+deactivate EditCntl
+NodeRef_or_DataSeq -> EncodeCntl : ConnectSequenceBase(outqueue)
+activate EncodeCntl
+EncodeCntl -> DataQueue_Edit : SetQueueInfo(linkbase_info_)
+activate DataQueue_Edit
+DataQueue_Edit -> DataQueue_Edit : data_link_ = linkbase_info_
+DataQueue_Edit -> QueueInfo_Encode : AddOutQueue(this)
+activate QueueInfo_Encode
+QueueInfo_Encode -> QueueInfo_Encode : add this into linkbase_info_
+DataQueue_Edit <- QueueInfo_Encode : last_index
+deactivate QueueInfo_Encode
+EncodeCntl <- DataQueue_Edit : last_index
+deactivate DataQueue_Edit
+NodeRef_or_DataSeq <- EncodeCntl : last_index
+deactivate EncodeCntl
+NodeRef_or_DataSeq -> EncodeCntl : Start()
+activate EncodeCntl
+EncodeCntl -> RelatedId : SetInterval(file_time, duration_time)
+deactivate EncodeCntl
+
+@enduml
