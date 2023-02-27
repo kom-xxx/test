@@ -1,3 +1,4 @@
+#include <time.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +48,12 @@ read_data(struct app_env *app)
 		guint8 *pb;
 		gboolean ok = TRUE;
 		size_t bs = 640 * 480 * 2;
-
+		{
+			struct timespec ts;
+			clock_gettime(CLOCK_MONOTONIC, &ts);
+			fprintf(stderr, "%s: %ld:%09ld\n",
+				__func__, ts.tv_sec, ts.tv_nsec);
+		}
 		elapsed_count += 1;
 
 		//pb = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, 640, 480);
@@ -142,6 +148,7 @@ bus_message(GstBus *bus, GstMessage *message, struct app_env *app)
 		break;
 	}
 	case GST_MESSAGE_EOS:
+		fprintf(stderr, "%s: >>>>>>>>>>> EOS\n", __func__);
 		g_main_loop_quit(app->loop);
 		break;
 	default:
@@ -170,9 +177,14 @@ main(int argc, char *argv[])
 
 	// Option 1: Display on screen via xvimagesink
 	app->pipeline =
-		gst_parse_launch("appsrc name=mysource is-live=true block=true "
-				 "caps=video/x-raw,width=640,height=480,"
-				 "format=YUY2,framerate=30/1 "
+		gst_parse_launch("appsrc name=mysource"
+				 " is-live=true"
+//				 " block=true"
+				 " caps=video/x-raw,width=640,height=480,"
+				 "format=YUY2,"
+				 "framerate=30/1 "
+//				 " allow-renegotiation=true "
+//				 "! queue "
 //				 "! videoconvert "
 				 "! autovideosink", NULL);
 
