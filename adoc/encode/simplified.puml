@@ -222,7 +222,8 @@ VideoIF -> VideoEncoder : FlushFrame
 activate VideoEncoder
 VideoEncoder -> GSTWrap : GstPipelinePushData
 activate GstPipelinePushData
-GstPipelinePushData -> gst_pipeline : gst_pipeline_push_data
+GSTWrap -> gst_pipeline : gst_pipeline_push_data
+deactivate gst_pipeline
 VideoEncoder <- GSTWrap :
 deactivate GSTWrap
 VideoIF <- VideoEncoder : 
@@ -230,11 +231,35 @@ deactivate VideoEncoder
 EncodeCntl -> VideoIF : CloseWrirwer
 deactivate VideoIF
 EncodeCntl -> EncodeCntl :
-deactivate EncodeCntl
+EncodeCntl -> VideoIF : CloseEncoder
+activate VideoIF
+VideoIF -> VideoOutput :
+activate VideoOutput
+VideoOutput -> VideoEncoder : CloseEncoder
+activate VideoEncoder
+VideoEncoder -> GSTWrap : GstPipelineClose
+activate GSTWrap
+GSTWrap -> gst_pipeline : gst_pipeline_close
+activate gst_pipeline
+note over gst_pipeline : pipeline にEOSを通知
+deactivate gst_pipeline
+GSTWrap <- gst_pipeline :
+VideoEncoder <- GSTWrap :
+deactivate GSTWrap
+VideoOutput <- VideoEncoder
+deactivate VideoEncoder
+VideoIF <- VideoOutput:
+deactivate VideoOutput
+EncodeCntl <- VideoIF
+deactivate VideoIF
 EncodeCntl -> EncodeCntl :
 deactivate EncodeCntl
 EncodeCntl -> EncodeCntl :
 deactivate EncodeCntl
 
 @enduml
+
+
+
+
 
