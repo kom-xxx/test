@@ -1,0 +1,240 @@
+@startuml
+participant NodeRef
+participant EditCntl
+participant EncodeCntl
+participant EncodeCntlThread
+participant thread_function
+participant VideoIF
+participant VideoOutput
+participant VideoEncoder
+participant EncoderBase
+participant VideoStreamPacket
+participant GSTWrap
+participant gst_pipeline
+
+activate EncodeCntl
+activate EncodeCntlThread
+== Start ==
+/'
+NodeRef -> EncodeCntl : Start()
+activate EncodeCntl
+EncodeCntl -> VideoIF : constructor()
+activate VideoIF
+VideoIF -> GSTWrap : constructor()
+activate GSTWrap
+EncodeCntl <- VideoIF : instance
+NodeRef <- EncodeCntl
+deactivate EncodeCntl
+== REC start ==
+NodeRef -> EncodeCntl : SetRecord(rec_start_time)
+group when [ recording_time_ == 0 ]
+  EncodeCntl -> EncodeCntl : recording_time_ = recording_time_
+end
+EncodeCntl -> EncodeCntl : id = related_id_.SetRelated(rec_start_time)
+NodeRef <- EncodeCntl : id
+
+== push Frame ==
+EditCntl -> EncodeCntl : PushEvent(kDataLinkIDNotice)
+EncodeCntl -> EncodeCntlThread : normal_queue.push(kDataLinkIDNotice)
+EncodeCntlThread -->> thread_function : cond_.notify_one()\nwakeup thread
+EditCntl <- EncodeCntlThread :
+thread_function -> EncodeCntlThread : EventFunction
+activate EncodeCntlThread
+EncodeCntlThread -> EncodeCntl : NoticeFrame
+activate EncodeCntl
+alt rec_start_time == 0
+  EncodeCntl -> EncodeCntl : CacheFrame()
+  activate EncodeCntl
+  note over EncodeCntl : cache_time_ 時間以上経過している frame を削除
+  EncodeCntl -> EncodeCntl
+  deactivate EncodeCntl
+else
+  EncodeCntl -> EncodeCntl : CodecFrame()
+  activate EncodeCntl
+  group while [ frame_item = FrontFrame(&pop_index) ]
+    EncodeCntl -> EncodeCntl : frame_time = frame_item->GetTine()\nrelated_data_id = related_id_.GetRelated(frame_time)
+    alt related_data_id > 0
+      alt related_data_id_ == 0
+        EncodeCntl -> EncodeCntl : CodecStart(frame_time)\nCodecPush(frame_item)
+      else related_data_id_ == related_data_id
+        EncodeCntl -> EncodeCntl : CodecPush(frame_item)
+      else
+        EncodeCntl -> EncodeCntl : CodecStop(frame_item, related_data_id_)\nCodecStart(frame_item)\nCodecPush(frame_item)
+      end
+    EncodeCntl -> EncodeCntl : related_data_id_ = related_data_id\nPopData(pop_index)
+    else
+      note over EncodeCntl : Recording time より前の framew は捨てる
+      EncodeCntl -> EncodeCntl : PopData(pop_index)
+      alt related_data_id_ > 0
+        EncodeCntl -> EncodeCntl : CodecStop(frame_item, related_data_id_)\nrecording_time_ = 0\nrelated_data_id_ = 0
+      end
+      deactivate EncodeCntl
+    end
+  end
+end
+EncodeCntlThread <- EncodeCntl :
+deactivate EncodeCntl
+thread_function <- EncodeCntlThread :
+deactivate EncodeCntlThread
+'/
+== CODEC START ==
+
+EncodeCntl -> EncodeCntl : CodecStart(frame_item)
+activate EncodeCntl
+EncodeCntl -> EncodeCntl : frame_time = frame_time->GetTime()
+EncodeCntl -> EncodeCntl : StartCodec(frame_time)
+activate EncodeCntl
+/'
+ '  START OF StartCodec
+ '/
+EncodeCntl -> EncodeCntl : first_time_ = 0
+loop index = 0; index < kmax_codec_num; index ++
+  alt encode_->codec_type[inde] == kEnumCodecTypeH264
+    note over EncodeCntl : encode_ : App から costructor に渡されるエンコーダー情報
+    EncodeCntl -> EncodeCntl : codec_id = AV_CODEC_ID_H264\n\
+width = v4l2_input_->width\nheight = v4l2_input_->height\n\
+framerate = v4l2_input_->framerate\nden = v4l2_input_->framerate * 1000\nnum = 1000\npixel_fmt = AV_PIX_FMT_YUV420P
+    note right
+      v4l2_input_ : App から costructor に渡されるカメラのフレーム情報
+    end note
+
+    EncodeCntl -> VideoIF : AddVideoEncoder(codec_id, width, height, framerate, den, num)
+    activate VideoIF
+    VideoIF -> VideoOutput : constructor
+    activate VideoOutput
+note across
+多数の codec に対応するためにいろいろやっているが、必要な情報は VideoEncoder 内で保存される
+end note
+    VideoOutput -> VideoEncoder : constructor(encoder_index, codec_id, width, height, framerate, den, num)
+    activate VideoEncoder
+    VideoEncoder -> EncoderBase : constructor(encoder_index)
+    activate EncoderBase
+    EncoderBase -> EncoderBase : index_ = encoder_index
+    VideoEncoder <- EncoderBase : instance
+    VideoEncoder -> VideoEncoder : codec_id_ = codec_id\nwidth_ = width\n\
+height_ = height\nframe_rate_ = framerate\nden_ = den\nnum_ = num\n\
+codec_context_ = nullptr
+    VideoIF <- VideoOutput : bool
+    EncodeCntl <- VideoIF : bool
+    deactivate VideoIF
+    EncodeCntl -> VideoIF : OpenEncoder(fmt)
+    note right : fmt = AV_PIX_FMT_YUV420P
+    activate VideoIF
+    VideoIF -> VideoOutput : OpenEncoder(AV_PIX_FMT_YUV420P)
+    loop encoder_ptr = encoder_list_
+      VideoOutput -> VideoEncoder : OpenEncoder(AV_PIX_FMT_YUV420P)
+      activate VideoEncoder
+      VideoEncoder -> GSTWrap : GSTPipelineCreate(width_, height_, frame_rate_, den_, num_, AV_PIX_FMT_YUV420P)
+      activate GSTWrap
+      GSTWrap -> gst_pipeline : gst_pipeline_create(width_, height_, frame_rate_, den_, num_, AV_PIX_FMT_YUV420P)
+      note over gst_pipeline : create pipeline
+      GSTWrap <- gst_pipeline : gst_pipeline_handle
+      GSTWrap -> GSTWrap : gst_pipeline_handle_ = gst_pipeline_handle
+      VideoEncoder <- GSTWrap : gst_pipeline_handle
+      deactivate GSTWrap
+      VideoOutput <- VideoEncoder : gst_pipeline_handle != nullptr
+      deactivate VideoEncoder
+      VideoIF <- VideoOutput :bool
+      deactivate VideoOutput
+    end
+  end
+end
+EncodeCntl <- VideoIF : bool
+deactivate VideoIF
+
+EncodeCntl -> EncodeCntl : OpenWriter(first_time)
+activate EncodeCntl
+EncodeCntl -> EncodeCntl : container_tmp_id_ = (container_tmp_id_ + 1) & 0xffff
+EncodeCntl -> EncodeCntl : tmp_file = "TMP_%08x.mp4", container_tmp_id_
+EncodeCntl -> VideoIF : OpenWriter(path, tmp_file, first_time)
+activate VideoIF
+VideoIF -> VideoOutput : OpenOutput(path, tmp_file, first_time)
+activate VideoOutput
+
+VideoOutput -> GSTWrap : GstPipelineOpen(filename = path + "/" + tmp_file)
+activate GSTWrap
+GSTWrap -> gst_pipeline : gst_pipeline_open(filename)
+activate gst_pipeline
+note over gst_pipeline
+  filesink の location に filename を設定
+  pipeline_control_thread に開始要求を投げる
+end note
+GSTWrap <- gst_pipeline : bool
+deactivate gst_pipeline
+VideoOutput <- GSTWrap : bool
+deactivate GSTWrap
+VideoIF <- VideoOutput : bool
+deactivate VideoOutput
+EncodeCntl <- VideoIF : bool
+note over EncodeCntl 
+出力ファイル関連の情報をまとめたものを
+ container_item_ptr_ に設定
+end note
+deactivate VideoIF
+/'
+ ' END OF StartCodec
+ '/
+EncodeCntl -> EncodeCntl
+deactivate EncodeCntl
+EncodeCntl -> EncodeCntl : ifrst_time_ = frame_time
+deactivate EncodeCntl
+EncodeCntl -> EncodeCntl
+deactivate EncodeCntl
+
+== CODEC PUSH ==
+EncodeCntl -> EncodeCntl : CodecPush(frame_time)
+activate  EncodeCntl
+EncodeCntl -> VideoIF : PushFrame(frame_item, first_time)
+activate VideoIF
+VideoIF -> VideoOutput : PushFrame(frame_item, first_time)
+activate VideoOutput
+VideoOutput -> VideoEncoder : PushFrame(frame_item, first_time)
+activate VideoEncoder
+VideoEncoder -> GSTWrap : GstPipelinePushData(frame_item, first_time)
+activate GSTWrap
+GSTWrap -> gst_pipeline : gst_pipeline_push_data(gst_pipeline_handle, frame_item->data, frame_item->size)
+activate gst_pipeline
+note over gst_pipeline : pipeline に data と size を渡し。引取完了を待つ
+GSTWrap -> gst_pipeline : bool
+deactivate gst_pipeline
+VideoEncoder <- GSTWrap : bool
+deactivate GSTWrap
+VideoOutput -> VideoEncoder : bool
+deactivate VideoEncoder
+VideoIF -> VideoOutput : bool
+deactivate VideoOutput
+EncodeCntl -> VideoIF : bool
+deactivate VideoIF
+EncodeCntl -> EncodeCntl :bool
+deactivate EncodeCntl
+
+
+== CODEC CLOSE ==
+EncodeCntl -> EncodeCntl : CodecStop
+activate EncodeCntl
+EncodeCntl -> EncodeCntl :StopCodec
+activate EncodeCntl
+EncodeCntl -> EncodeCntl : CloseWriter
+activate EncodeCntl
+EncodeCntl -> VideoIF : CloseWrirwer
+activate VideoIF
+VideoIF -> VideoEncoder : FlushFrame
+activate VideoEncoder
+VideoEncoder -> GSTWrap : GstPipelinePushData
+activate GstPipelinePushData
+GstPipelinePushData -> gst_pipeline : gst_pipeline_push_data
+VideoEncoder <- GSTWrap :
+deactivate GSTWrap
+VideoIF <- VideoEncoder : 
+deactivate VideoEncoder
+EncodeCntl -> VideoIF : CloseWrirwer
+deactivate VideoIF
+EncodeCntl -> EncodeCntl :
+deactivate EncodeCntl
+EncodeCntl -> EncodeCntl :
+deactivate EncodeCntl
+EncodeCntl -> EncodeCntl :
+deactivate EncodeCntl
+
+@enduml
+
