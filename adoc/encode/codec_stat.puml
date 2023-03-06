@@ -41,7 +41,7 @@ EncodeCntl -> VideoIF : OpenEncoder(AV_PIX_FMT_YUV420P)
 VideoIF -> GSTWrap : GSTWrapPiplineCreate(width_, height_,\n\
         frame_rate_, den_, num_)
 GSTWrap -> gst_pipeline : gst_pipeline_create(width_, height_,\n\
-        frame_rate_, den_, num_)
+        frame_rate_, den_, num_, AV_PIX_FMT_YUV420P)
 note over gst_pipeline
 create pipline
 add callback

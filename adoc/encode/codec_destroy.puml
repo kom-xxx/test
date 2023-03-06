@@ -23,7 +23,7 @@ activate gst_pipeline
 EncodeCntl -> VideoIF : destructor()
 VideoIF -> GSTWrap : destructor()
 GSTWrap -> gst_pipeline : git_pipline_destroy(pipeline_handle_)
-note over git_pipline_destroy
+note over git_pipline
 request finish to pipeline control thread
   pipeline control thread:
     relasse all pipelime elememts
