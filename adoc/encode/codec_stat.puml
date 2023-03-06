@@ -1,0 +1,71 @@
+@startuml
+'participant NodeRef
+'participant EditCntl
+participant EncodeCntl
+'participant EncodeCntlThread
+'participant thread_function
+participant VideoIF
+'participant VideoOutput
+'participant VideoEncoder
+'participant EncoderBase
+'participant VideoStreamPacket
+participant GSTWrap
+participant gst_pipeline
+
+activate EncodeCntl
+'activate EncodeCntlThread
+activate VideoIF
+activate GSTWrap
+activate gst_pipeline
+
+== CODEC START ==
+/'
+ '  START OF StartCodec
+ '/
+EncodeCntl -> EncodeCntl : CodecStart()
+activate EncodeCntl
+EncodeCntl -> EncodeCntl : StartCodec()
+activate EncodeCntl
+EncodeCntl -> VideoIF : AddVideoEncoder(encoder_index, codec_id,\n\
+        width, height, farmerate, den, num)
+note right
+encoder_index_ = encoder_index
+codec_id_ = codec_id
+width_ = width
+height_ = height
+frame_rate_ = framerate
+den_ den
+num_ = num
+end note
+EncodeCntl -> VideoIF : OpenEncoder(AV_PIX_FMT_YUV420P)
+VideoIF -> GSTWrap : GSTWrapPiplineCreate(width_, height_,\n\
+        frame_rate_, den_, num_)
+GSTWrap -> gst_pipeline : gst_pipeline_create(width_, height_,\n\
+        frame_rate_, den_, num_)
+note over gst_pipeline
+create pipline
+add callback
+add signal handlers
+create pipeline_control_thread
+end note
+GSTWrap <- gst_pipeline : gst_pipeline_handle
+GSTWrap -> GSTWrap : pipeline_handle_ = gst_pipeline_handle
+VideoIF <- GSTWrap :
+EncodeCntl <- VideoIF
+EncodeCntl -> EncodeCntl : OpenWriter()
+activate EncodeCntl
+EncodeCntl -> VideoIF : OpenWriter(path_, tmp_file)
+VideoIF -> GSTWrap : GSTWrapPipelineOpen(path + "/" +  tmp_file)
+GSTWrap -> gst_pipeline : gst_pipeline_open(pipeline_handle_, filename)
+note over gst_pipeline
+set filename to location property of filesink
+start pipeline
+end note
+GSTWrap <- gst_pipeline :
+VideoIF <- GSTWrap :
+EncodeCntl <- VideoIF
+deactivate EncodeCntl
+deactivate EncodeCntl
+deactivate EncodeCntl
+
+@enduml

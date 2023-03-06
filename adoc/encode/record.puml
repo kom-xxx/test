@@ -1,0 +1,103 @@
+@startuml
+participant NodeRef_or_DataSeq
+/'
+participant EditCntl
+participant DataQueue_Edit
+participant QueueInfo_Edit
+'/
+participant EncodeCntl
+/'
+participant SequenceBase
+participant QueueInfo_Encode
+participant EncodeCntlThread
+participant SequenceBaseThread
+participant Thread
+participant ThreadFunc
+participant VideoIF
+'/
+participant RelatedId
+participant EncodeTime
+
+activate NodeRef_or_DataSeq
+/'
+activate EditCntl
+activate DataQueue_Edit
+activate QueueInfo_Edit
+'/
+activate EncodeCntl
+/'
+activate SequenceBase
+activate QueueInfo_Encode
+activate EncodeCntlThread
+activate SequenceBaseThread
+activate Thread
+activate ThreadFunc
+activate VideoIF
+'/
+activate RelatedId
+
+NodeRef_or_DataSeq -> EncodeCntl : SetRecord(recording_time)
+activate EncodeCntl
+group when [ recording_time_ == 0 ]
+  EncodeCntl -> EncodeCntl : recording_time_ = recording_time
+end
+note over RelatedId : file_time_ and duration_time_ was already set in EncodeCntl.Start()
+EncodeCntl -> RelatedId : SetRelated(recording_time)
+activate RelatedId
+RelatedId -> RelatedId : top_time = recording_time
+RelatedId -> RelatedId : remain_time = duration_time_
+RelatedId -> RelatedId : UpdateRelarted(top_time, remain_time)
+activate RelatedId
+note over RelatedId : when this call does not first time\n    process related_id_list_
+RelatedId -> RelatedId : AddRelated(toptime, &remain)
+activate RelatedId
+RelatedId -> RelatedId : related_id = 0
+RelatedId -> EncodeTime : constructor
+activate EncodeTime
+EncodeTime -> EncodeTime : start_time(0), end_time(0)
+RelatedId <- EncodeTime : instance
+RelatedId -> RelatedId : encode_time = instance
+RelatedId -> RelatedId : related_id = ++related_data_id_
+RelatedId -> EncodeTime : SetTime(top_time, *remain, file_time_)
+activate EncodeTime
+alt start_time_ == 0
+  EncodeTime -> EncodeTime : start_time_ = top_time\nend_time = top_time + min(file_tom,e_, *remain)\nremain_time_ = start_time_ + remain - emd_time_
+else
+  EncodeTime -> EncodeTime : first_time = top_time - start_time_
+  EncodeTime -> EncodeTime : end_time = top_time + first_time + min(*remain, file_time - first_time)
+  EncodeTime -> EncodeTime : remain = remain - (end_time_ - top_time)
+end
+RelatedId <- EncodeTime : remain
+deactivate EncodeTime
+RelatedId -> RelatedId : *remain = remain
+RelatedId -> RelatedId : related_pair = pair(encode_time,related_id)
+RelatedId -> RelatedId : id_ptr = shard_ptr<...>(related_pair)
+RelatedId -> RelatedId : related_id_list_.push_baxk(id_ptr)
+RelatedId -> EncodeTime : GetEndTime()
+RelatedId <- EncodeTime : end_time_
+RelatedId -> RelatedId : end_time_
+deactivate RelatedId
+RelatedId -> RelatedId : top_time = end_time_
+RelatedId -> RelatedId : remain
+deactivate RelatedId
+RelatedId -> RelatedId : GetRealtedId(related_time)
+activate RelatedId
+RelatedId -> RelatedId : related_id = 0
+loop id_ptr : related_id_list_
+  RelatedId -> EncodeTime : IsTime(related_time)
+  activate EncodeTime
+  EncodeTime -> EncodeTime : ret = start_time_ <= time < end_time_
+  RelatedId <- EncodeTime : ret
+  deactivate EncodeTime
+  group when [ ret == true ]
+    RelatedId -> RelatedId : related_id = id_str.second()
+    RelatedId -> RelatedId : break
+  end
+end
+RelatedId -> RelatedId : related_id
+deactivate RelatedId
+EncodeCntl <- RelatedId : related_id
+deactivate EncodeCntl
+NodeRef_or_DataSeq <- EncodeCntl : related_id
+deactivate RelatedId
+@enduml

@@ -1,0 +1,44 @@
+@startuml
+'participant NodeRef
+'participant EditCntl
+participant EncodeCntl
+'participant EncodeCntlThread
+'participant thread_function
+participant VideoIF
+'participant VideoOutput
+'participant VideoEncoder
+'participant EncoderBase
+'participant VideoStreamPacket
+participant GSTWrap
+participant gst_pipeline
+
+activate EncodeCntl
+'activate EncodeCntlThread
+activate VideoIF
+activate GSTWrap
+activate gst_pipeline
+
+== CODEC STOP ==
+[-> EncodeCntl: from API:\n    Stop()
+EncodeCntl -> VideoIF : destructor()
+VideoIF -> GSTWrap : destructor()
+GSTWrap -> gst_pipeline : git_pipline_destroy(pipeline_handle_)
+note over git_pipline_destroy
+request finish to pipeline control thread
+  pipeline control thread:
+    relasse all pipelime elememts
+    release g_main_loop
+    exit thread
+wait for done of pipeline control thread
+end note
+GSTWrap <- gst_pipeline
+destroy gst_pipeline
+VideoIF <- GSTWrap
+destroy GSTWrap
+EncodeCntl <- VideoIF
+destroy VideoIF
+[<- EncodeCntl
+
+@enduml
+
+

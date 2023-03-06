@@ -1,0 +1,37 @@
+@startuml
+'participant NodeRef
+'participant EditCntl
+participant EncodeCntl
+'participant EncodeCntlThread
+'participant thread_function
+'participant VideoIF
+'participant VideoOutput
+'participant VideoEncoder
+'participant EncoderBase
+'participant VideoStreamPacket
+'participant GSTWrap
+'participant gst_pipeline
+
+activate EncodeCntl
+
+== CODEC FRAME ==
+[-> EncodeCntl : from EditCntl\n    NoteieData invoke CodecFrame
+EncodeCntl -> EncodeCntl : CodecFrame(frame_item)
+activate EncodeCntl
+group while [ !DataQueue.empty() ]
+  alt first_frame?
+    EncodeCntl -> EncodeCntl : CpdecStart(FrameItem)
+    EncodeCntl -> EncodeCntl : CodecPush(FrameItem)
+  else frame time is in current file time?
+    EncodeCntl -> EncodeCntl : CodecPush(FrameItem)
+  else
+    EncodeCntl -> EncodeCntl : CodecStop(FrameItem, data_id)
+    EncodeCntl -> EncodeCntl : CodecStart(FrameItem)
+    note right : new file was oened
+    EncodeCntl -> EncodeCntl : CodecPush(FrameItem)
+  end
+  EncodeCntl -> EncodeCntl : PopData()
+end
+deactivate EncodeCntl
+
+@enduml

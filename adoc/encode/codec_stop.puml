@@ -1,0 +1,46 @@
+@startuml
+'participant NodeRef
+'participant EditCntl
+participant EncodeCntl
+'participant EncodeCntlThread
+'participant thread_function
+participant VideoIF
+'participant VideoOutput
+'participant VideoEncoder
+'participant EncoderBase
+'participant VideoStreamPacket
+participant GSTWrap
+participant gst_pipeline
+
+activate EncodeCntl
+'activate EncodeCntlThread
+activate VideoIF
+activate GSTWrap
+activate gst_pipeline
+
+== CODEC STOP ==
+EncodeCntl -> EncodeCntl : CodecStop
+activate EncodeCntl
+note over EncodeCntl
+最後の frame は push されていないので VideoIF::PushFrame を呼んでpush
+end note
+EncodeCntl -> EncodeCntl : StopCodec()
+activate EncodeCntl
+EncodeCntl -> EncodeCntl : CloseWriter()'
+EncodeCntl -> VideoIF : CloseWriter()
+EncodeCntl <- VideoIF : CloseWriter()
+deactivate EncodeCntl
+EncodeCntl -> VideoIF : CloseEncoder()
+VideoIF -> GSTWrap : GSTWrapPipelineClose()
+GSTWrap -> gst_pipeline : gst_pipeline_close(pipeline_handle_)
+note over gst_pipeline
+change pipline state from RUNNING to NULL
+end note
+GSTWrap <- gst_pipeline :
+VideoIF -> GSTWrap :
+EncodeCntl <- VideoIF :
+EncodeCntl -> VideoIF : RemoveEncoder()
+EncodeCntl <- VideoIF :
+deactivate EncodeCntl
+
+@enduml

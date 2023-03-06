@@ -1,0 +1,38 @@
+@startuml
+'participant NodeRef
+'participant EditCntl
+participant EncodeCntl
+'participant EncodeCntlThread
+'participant thread_function
+participant VideoIF
+'participant VideoOutput
+'participant VideoEncoder
+'participant EncoderBase
+'participant VideoStreamPacket
+participant GSTWrap
+participant gst_pipeline
+
+activate EncodeCntl
+'activate EncodeCntlThread
+activate VideoIF
+activate GSTWrap
+activate gst_pipeline
+
+== CODEC PUSH ==
+EncodeCntl -> EncodeCntl : CodecPush(FrameItem)
+activate EncodeCntl
+EncodeCntl -> VideoIF : PushFrame(FrameItem)
+VideoIF -> GSTWrap : GSTWrapPipelinePushData(\n\
+        row data of FrameItem, size of raw data)
+GSTWrap -> gst_pipeline : gst_pipeline_push_data(rawdata, raw_data_size)
+note over gst_pipeline
+set pull data
+wait for done of data pull
+end note
+GSTWrap <- gst_pipeline
+VideoIF <- GSTWrap
+EncodeCntl <- VideoIF
+deactivate EncodeCntl
+@enduml
+
+

@@ -1,0 +1,118 @@
+@startuml
+'participant NodeRef
+'participant EditCntl
+participant EncodeCntl
+participant EncodeCntlThread
+'participant thread_function
+'participant VideoIF
+'participant VideoOutput
+'participant VideoEncoder
+'participant EncoderBase
+'participant VideoStreamPacket
+'participant GSTWrap
+'participant gst_pipeline
+
+== Create ==
+[-> EncodeCntl : from API\n    path, APISetupEncode, APISetupVideoInput
+note right
+APISetupVideoInput:
+    device_type => eg. kValueDeviceTypeV4L2
+    framerate
+    width
+    height
+    device_path
+ApiSetupEncode:
+    cache_time
+    duration_time
+    file_time
+    codec_type[2]
+end note
+
+activate EncodeCntl
+== Start ==
+[-> EncodeCntl : from API\n    Start()
+EncodeCntl -> VideoIF : constructor()
+activate VideoIF
+EncodeCntl -> EncodeCntlThread : constructor(this)
+activate EncodeCntlThread
+
+/'
+NodeRef -> EncodeCntl : Start()
+activate EncodeCntl
+EncodeCntl -> VideoIF : constructor()
+activate VideoIF
+VideoIF -> GSTWrap : constructor()
+activate GSTWrap
+EncodeCntl <- VideoIF : instance
+NodeRef <- EncodeCntl
+deactivate EncodeCntl
+'/
+== REC start ==
+[-> EncodeCntl : from API\n    SetRecord(recoding_start_time)
+/'
+NodeRef -> EncodeCntl : SetRecord(rec_start_time)
+group when [ recording_time_ == 0 ]
+  EncodeCntl -> EncodeCntl : recording_time_ = recording_time_
+end
+EncodeCntl -> EncodeCntl : id = related_id_.SetRelated(rec_start_time)
+NodeRef <- EncodeCntl : id
+'/
+'== push Frame ==
+/'
+EditCntl -> EncodeCntl : PushEvent(kDataLinkIDNotice)
+EncodeCntl -> EncodeCntlThread : normal_queue.push(kDataLinkIDNotice)
+EncodeCntlThread -->> thread_function : cond_.notify_one()\nwakeup thread
+EditCntl <- EncodeCntlThread :
+thread_function -> EncodeCntlThread : EventFunction
+activate EncodeCntlThread
+EncodeCntlThread -> EncodeCntl : NoticeFrame
+activate EncodeCntl
+alt rec_start_time == 0
+  EncodeCntl -> EncodeCntl : CacheFrame()
+  activate EncodeCntl
+  note over EncodeCntl : cache_time_ 時間以上経過している frame を削除
+  EncodeCntl -> EncodeCntl
+  deactivate EncodeCntl
+else
+  EncodeCntl -> EncodeCntl : CodecFrame()
+  activate EncodeCntl
+  group while [ frame_item = FrontFrame(&pop_index) ]
+    EncodeCntl -> EncodeCntl : frame_time = frame_item->GetTine()\nrelated_data_id = related_id_.GetRelated(frame_time)
+    alt related_data_id > 0
+      alt related_data_id_ == 0
+        EncodeCntl -> EncodeCntl : CodecStart(frame_time)\nCodecPush(frame_item)
+      else related_data_id_ == related_data_id
+        EncodeCntl -> EncodeCntl : CodecPush(frame_item)
+      else
+        EncodeCntl -> EncodeCntl : CodecStop(frame_item, related_data_id_)\nCodecStart(frame_item)\nCodecPush(frame_item)
+      end
+    EncodeCntl -> EncodeCntl : related_data_id_ = related_data_id\nPopData(pop_index)
+    else
+      note over EncodeCntl : Recording time より前の framew は捨てる
+      EncodeCntl -> EncodeCntl : PopData(pop_index)
+      alt related_data_id_ > 0
+        EncodeCntl -> EncodeCntl : CodecStop(frame_item, related_data_id_)\nrecording_time_ = 0\nrelated_data_id_ = 0
+      end
+      deactivate EncodeCntl
+    end
+  end
+end
+EncodeCntlThread <- EncodeCntl :
+deactivate EncodeCntl
+thread_function <- EncodeCntlThread :
+deactivate EncodeCntlThread
+'/
+== CODEC START ==
+[-> EncodeCntl : from EncodeCntl : NoticeData
+EncodeCntl -> EncodeCntl : NoticeFrame
+activate EncodeCntl
+alt recording_time_ == 0
+  EncodeCntl -> EncodeCntl :  CacheFrame()
+else
+  EncodeCntl -> EncodeCntl : CodecFrame()
+end
+deactivate EncodeCntl
+
+
+
+@enduml
